@@ -128,7 +128,23 @@ static bool migrate_one_irq(struct irq_desc *desc)
 	 * mask and therefore might keep/reassign the irq to the outgoing
 	 * CPU.
 	 */
+
+#ifdef CONFIG_ARCH_AXXIA
+	/* TODO: Why do we have to do this for Axxia 5500 */
+
+extern struct device_node *
+	of_find_compatible_node(struct device_node *from,
+				const char *type,
+				const char *compat);
+
+	if (of_find_compatible_node(NULL, NULL, "axxia,axm5500") ||
+	    of_find_compatible_node(NULL, NULL, "axxia,axm5516"))
+		err = irq_do_set_affinity(d, affinity, true);
+	else
+		err = irq_do_set_affinity(d, affinity, false);
+#else
 	err = irq_do_set_affinity(d, affinity, false);
+#endif
 	if (err) {
 		pr_warn_ratelimited("IRQ%u: set affinity failed(%d).\n",
 				    d->irq, err);
