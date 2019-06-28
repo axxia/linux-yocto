@@ -1,17 +1,18 @@
 /* SPDX-License-Identifier: GPL-2.0
  * Copyright (C) 2003 INTEL Corporation
  */
+
 #ifndef __LSI_MTC_IOCTL_H
 #define __LSI_MTC_IOCTL_H
 
 #include <linux/axxia-mtc.h>
 
 struct lsi_mtc_cfg_t {
-	unsigned int   opmode;
-	unsigned int   recmode;
-	unsigned int   clkmod;
-	unsigned int   clkspeed;
-	unsigned int   buffmode;
+	unsigned int   opMode;
+	unsigned int   recMode;
+	unsigned int   clkMod;
+	unsigned int   clkSpeed;
+	unsigned int   buffMode;
 };
 
 struct lsi_mtc_tckclk_gate_t {
@@ -20,55 +21,55 @@ struct lsi_mtc_tckclk_gate_t {
 };
 
 struct lsi_mtc_stats_regs_t {
-	unsigned int statsreg1;
-	unsigned int statsreg2;
+	unsigned int statsReg1;
+	unsigned int statsReg2;
 };
 
 struct lsi_mtc_debug_regs_t {
-	unsigned int debugreg0;
-	unsigned int debugreg1;
-	unsigned int debugreg2;
-	unsigned int debugreg3;
-	unsigned int debugreg4;
-	unsigned int debugreg5;
+	unsigned int debugReg0;
+	unsigned int debugReg1;
+	unsigned int debugReg2;
+	unsigned int debugReg3;
+	unsigned int debugReg4;
+	unsigned int debugReg5;
 };
 
 struct lsi_mtc_axi_capt_window_param_t {
 	/* TDO Capture Monitor window size in bits;
-	 *  0-disable 1-minitor first bit captured
+	 * 0-disable 1-minitor first bit captured
 	 */
-	unsigned int	captwindowcnt;
+	unsigned int	captWindowCnt;
 	/* TDO capture bit position to monitor within the window size */
-	unsigned int	captwindowmonbit0;
+	unsigned int	captWindowMonBit0;
 	/* TDO capture bit value to monitor within the window size inverted */
-	unsigned int	captwindowmoninv0;
+	unsigned int	captWindowMonInv0;
 	/* TDO capture bit position to monitor within the window size */
-	unsigned int	captwindowmonbit1;
+	unsigned int	captWindowMonBit1;
 	/* TDO capture bit value to monitor within the window size inverted */
-	unsigned int	captwindowmoninv1;
+	unsigned int	captWindowMonInv1;
 	/* TDO capture bit position to monitor within the window size */
-	unsigned int	captwindowmonbit2;
+	unsigned int	captWindowMonBit2;
 	/* TDO capture bit value to monitor within the window size inverted */
-	unsigned int	captwindowmoninv2;
+	unsigned int	captWindowMonInv2;
 };
 
 struct lsi_mtc_axi_extmem_wm_t {
-	unsigned int	highwatermark;
-	unsigned int	lowwatermark;
+	unsigned int	highWaterMark;
+	unsigned int	lowWaterMark;
 };
 
 struct lsi_mtc_axi_master_addr_t {
-	unsigned int	strtaddrlow;
-	unsigned int	strtaddrhigh;
-	unsigned int	stopaddrlow;
-	unsigned int	stopaddrhigh;
+	unsigned int	strtAddrLow;
+	unsigned int	strtAddrHigh;
+	unsigned int	stopAddrLow;
+	unsigned int	stopAddrHigh;
 };
 
 struct lsi_mtc_axi_status_regs_t {
-	unsigned int axistatusreg0;
-	unsigned int axistatusreg1;
-	unsigned int axistatusreg2;
-	unsigned int axistatusreg3;
+	unsigned int axiStatusReg0;
+	unsigned int axiStatusReg1;
+	unsigned int axiStatusReg2;
+	unsigned int axiStatusReg3;
 };
 
 /* debug operation */
@@ -86,7 +87,7 @@ struct lsi_mtc_axi_status_regs_t {
 #define MTC_SINGLESTEP_ENABLE \
 	_IOW(AXXIA_MTC_IOC_MAGIC, 2, int)
 
-/*enable/disable loop mode */
+/* enale/disable loop mode */
 #undef MTC_LOOPMODE_ENABLE
 #define MTC_LOOPMODE_ENABLE \
 	_IOW(AXXIA_MTC_IOC_MAGIC, 3, int)
