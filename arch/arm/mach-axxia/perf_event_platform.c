@@ -209,7 +209,7 @@ static int axmperf_probe(struct platform_device *dev)
 {
 	int ret;
 
-	axm_pmu = kzalloc(sizeof(axm_pmu), GFP_KERNEL);
+	axm_pmu = kzalloc(sizeof(*axm_pmu), GFP_KERNEL);
 	if (!axm_pmu)
 		return -ENOMEM;
 
