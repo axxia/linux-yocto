@@ -42,7 +42,7 @@
 #define BSWAP(x)  __builtin_bswap32(x)     /* Use gcc built-in byte swap code */
 
 #define DESTID_INVALID (u16)(0xff)
-#define RIO_SET_DID(size, x)	((size) ? ((x) & 0xffff) : \
+#define RIO_SET_DID(size, x)	((size) ? ((x) & 0xffff) :	\
 				 (((x) & 0x000000ff) << 16))
 
 /*******************************/
@@ -355,7 +355,7 @@
 
 /* DME Message Descriptor Table */
 #define DESC_TABLE_W0_NDX(d)         (0x10 * (d))
-#define DESC_TABLE_W0_RAB_BASE(d)    (RAB_REG_BASE + \
+#define DESC_TABLE_W0_RAB_BASE(d)    (RAB_REG_BASE +			\
 				      0x10000 + DESC_TABLE_W0_NDX(d))
 #define DESC_TABLE_W0(d)                (DESC_TABLE_W0_RAB_BASE(d) + 0x0)
 #define DESC_TABLE_W1(d)                (DESC_TABLE_W0_RAB_BASE(d) + 0x4)
@@ -381,9 +381,9 @@
 #define DME_DESC_DW0_NXT_DESC_VALID     BIT(1)
 #define DME_DESC_DW0_VALID              (1)
 
-#define DESC_STATE_TO_ERRNO(s)	((s) & DME_DESC_DW0_TIMEOUT_ERR ?	 \
+#define DESC_STATE_TO_ERRNO(s)	((s) & DME_DESC_DW0_TIMEOUT_ERR ?	\
 				 -ETIME : ((s) & (DME_DESC_DW0_RIO_ERR | \
-						DME_DESC_DW0_AXI_ERR) ?  \
+						  DME_DESC_DW0_AXI_ERR) ? \
 					   -EPROTO : 0))
 
 #define DME_DESC_DW0_READY_MASK         0x00000F00
