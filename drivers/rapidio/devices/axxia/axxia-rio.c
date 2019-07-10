@@ -41,19 +41,19 @@ static DEFINE_SPINLOCK(rio_io_lock);
 #define	EXT1P(...)
 #endif
 
-#define RIO_IO_READ_HOME        0x00
-#define RIO_MAINT_READ          0x01
-#define RIO_MAINT_WRITE         0x10
-#define RIO_NREAD               0x02
-#define RIO_NWRITE              0x20
-#define RIO_NWRITE_R            0x40
-#define RIO_SWRITE              0x80
+#define RIO_IO_READ_HOME	0x00
+#define RIO_MAINT_READ		0x01
+#define RIO_MAINT_WRITE		0x10
+#define RIO_NREAD		0x02
+#define RIO_NWRITE		0x20
+#define RIO_NWRITE_R		0x40
+#define RIO_SWRITE		0x80
 
-#define RIO_PHY_PARALLEL        0x00
-#define RIO_PHY_SERIAL          0x01
+#define RIO_PHY_PARALLEL	0x00
+#define RIO_PHY_SERIAL		0x01
 
 int
-	axxia_rio_is_x9(void)
+axxia_rio_is_x9(void)
 {
 	if (of_find_compatible_node(NULL, NULL, "axxia,axm5616"))
 		return 1;
@@ -149,21 +149,21 @@ axxia_rapidio_board_init(struct platform_device *dev, int dev_num,
  *
  * - Big and Little Endian mode registers
  *   Big Endian:
- *       0x0000-0xFFFC   - RapidIO Standard Registers
- *       0x10000-0x1FFFC - Endpoint Controller Specific Registers
+ *	 0x0000-0xFFFC	 - RapidIO Standard Registers
+ *	 0x10000-0x1FFFC - Endpoint Controller Specific Registers
  *   Little Endian
- *       0x20000-0x3FFFC - Peripheral Bus Bridge Specific Registers
+ *	 0x20000-0x3FFFC - Peripheral Bus Bridge Specific Registers
  *
  * "SRIO_CONF" registers in AXXIA (e.g. page selection register)
  * are also Little Endian.  SRIO_CONF is organized as follows:
  *
  * - 0x000 .. 0x7ff    Fixed mapping to SRIO/RAB endpoint controller specific
- *                     registers equivalent to 0x20000 .. 0x207ff.  The
- *                     RAB_APB_CSR register within this block is used to
- *                     control the page selection of the 'paged mapping'
- *                     block.
+ *		       registers equivalent to 0x20000 .. 0x207ff.  The
+ *		       RAB_APB_CSR register within this block is used to
+ *		       control the page selection of the 'paged mapping'
+ *		       block.
  * - 0x800 .. 0xfff    Paged mapping to SRIO generic+endpoint controller
- *                     specific registers equivalent to 0x00000 .. 0x3ffff
+ *		       specific registers equivalent to 0x00000 .. 0x3ffff
  *
  * To avoid an extra spin-lock layer in __axxia_local_config_read
  * and __axxia_local_config_write, perform all internal driver accesses
@@ -392,7 +392,7 @@ int axxia_rio_config_read(struct rio_mport *mport, int index,
 	     rbar);
 
 	ctrl &= ~TARGID(0xffff); /* Target id clear */
-	ctrl |= TARGID(destid);  /* Target id set */
+	ctrl |= TARGID(destid);	 /* Target id set */
 	alcw(priv,
 	     RAB_APIO_AMAP_CTRL(priv->maint_win_id),
 	     ctrl);
@@ -496,7 +496,7 @@ int axxia_rio_config_write(struct rio_mport *mport, int index,
 	     rbar);
 
 	ctrl &= ~TARGID(0xffff); /* Target id clear */
-	ctrl |= TARGID(destid);  /* Target id set */
+	ctrl |= TARGID(destid);	 /* Target id set */
 	alcw(priv,
 	     RAB_APIO_AMAP_CTRL(priv->maint_win_id),
 	     ctrl);
@@ -554,12 +554,12 @@ static inline int __flags2rio_tr_type(u32 mflags, u32 *trans_type)
 
 /**
  * axxia_rio_req_outb_region -- Request outbound region in the
- *                            RapidIO bus address space.
+ *			      RapidIO bus address space.
  * @mport:  RapidIO master port
  * @size:   The mapping region size.
  * @name:   Resource name
  * @flags:  Flags for mapping. 0 for using default flags.
- * @id:     Allocated outbound ATMU window id
+ * @id:	    Allocated outbound ATMU window id
  *
  * Return: 0 -- Success.
  *
@@ -997,7 +997,7 @@ static void rio_rab_ctrl_setup(struct rio_mport *mport)
 
 /**
  * rio_rab_pio_enable - Setup Peripheral Bus bridge,
- *                      RapidIO <-> Peripheral bus, HW.
+ *			RapidIO <-> Peripheral bus, HW.
  *
  * @mport: Master port
  *
@@ -1015,12 +1015,12 @@ static void rio_rab_pio_enable(struct rio_mport *mport)
 
 /**
  * rio_static_win_init -- Setup static ATMU window for maintenance
- *                        access and enable doorbells
+ *			  access and enable doorbells
  *
  * @mport: Master port
  *
  * Returns:
- * 0        - At success
+ * 0	    - At success
  * -EFAULT  - Requested outbound region can not be claimed
  */
 int axxia_rio_static_win_init(struct rio_mport *mport)
@@ -1049,7 +1049,7 @@ err:
 
 /**
  * axxia_rio_static_win_release -- Release static ATMU maintenance window
- *                                 Disable doorbells
+ *				   Disable doorbells
  *
  * @mport: Master port
  *
@@ -1078,14 +1078,14 @@ void axxia_rio_static_win_release(struct rio_mport *mport)
  * @regs: RapidIO registers from DTB
  * @ob_num_dmes: Number of outbound DMEs available
  * @outb_dmes: RapidIO outbound DMEs array available;
- *                [0] for MSeg, [1] for SSeg
+ *		  [0] for MSeg, [1] for SSeg
  * @ib_num_dmes: Number of inbound DMEs available
  * @inb_dmes: RapidIO inbound DMEs array available; 2 elements
  * @irq: RapidIO IRQ mapping from DTB
  *
  * Returns:
- * -EFAULT          At failure
- * 0                Success
+ * -EFAULT	    At failure
+ * 0		    Success
  */
 static int rio_parse_dtb(struct platform_device *dev, int *ndx, u64 *law_start,
 			 u64 *law_size, struct resource *regs, int *ob_num_dmes,
@@ -1247,8 +1247,8 @@ static int rio_parse_dtb(struct platform_device *dev, int *ndx, u64 *law_start,
  * rio_ops_setup - Alloc and initiate the RIO ops struct
  *
  * Returns:
- * ERR_PTR(-ENOMEM)      At failure
- * struct rio_ops *ptr   to initialized ops data at Success
+ * ERR_PTR(-ENOMEM)	 At failure
+ * struct rio_ops *ptr	 to initialized ops data at Success
  */
 static struct rio_ops *rio_ops_setup(void)
 {
@@ -1280,7 +1280,7 @@ static struct rio_ops *rio_ops_setup(void)
 
 /**
  * rio_mport_dtb_setup - Alloc and initialize the master port data
- *                       structure with data retrieved from DTB
+ *			 structure with data retrieved from DTB
  *
  * @dev: RIO platform device
  * @law_start: Local Access Window start address from DTB
@@ -1292,7 +1292,7 @@ static struct rio_ops *rio_ops_setup(void)
  * Register doorbell and mbox resources with generic RIO driver
 
  * Returns:
- * -ENOMEM                 At failure
+ * -ENOMEM		   At failure
  * struct rio_mport *ptr   to initialized mport data at Success
  */
 static int rio_mport_dtb_setup(struct platform_device *dev,
@@ -1309,6 +1309,13 @@ static int rio_mport_dtb_setup(struct platform_device *dev,
 
 	if (!mport)
 		return -ENOMEM;
+
+	rc = rio_mport_initialize(mport);
+	if (rc) {
+		kfree(mport);
+
+		return rc;
+	}
 
 	mport->index = port_ndx;
 
@@ -1344,7 +1351,7 @@ static int rio_mport_dtb_setup(struct platform_device *dev,
 
 /**
  * rio_priv_dtb_setup - Alloc and initialize the master port private data
- *                      structure with data retrieved from DTB
+ *			structure with data retrieved from DTB
  *
  * @dev: RIO platform device
  * @regs: RapidIO registers from DTB
@@ -1360,8 +1367,8 @@ static int rio_mport_dtb_setup(struct platform_device *dev,
  * Init master port private data structure
  *
  * Returns:
- * ERR_PTR(-ENOMEM)        At failure
- * struct rio_priv *ptr    to initialized priv data at Success
+ * ERR_PTR(-ENOMEM)	   At failure
+ * struct rio_priv *ptr	   to initialized priv data at Success
  */
 
 static struct rio_priv *
@@ -1565,8 +1572,8 @@ int axxia_rio_start_port(struct rio_mport *mport)
  *    doesn't complete successfully.
  *
  * Returns:
- * <0           Failure
- * 0            Success
+ * <0		Failure
+ * 0		Success
  */
 static int axxia_rio_setup(struct platform_device *dev)
 {
