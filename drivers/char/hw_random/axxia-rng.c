@@ -398,8 +398,8 @@ static int axxia_trng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
 	return j;
 }
 
-static ssize_t testmode_show(struct device_driver *drv,
-			     char *buf)
+static ssize_t trng_test_mode_show(struct device_driver *drv,
+				   char *buf)
 {
 	ssize_t ret;
 
@@ -409,8 +409,8 @@ static ssize_t testmode_show(struct device_driver *drv,
 	return ret;
 }
 
-static ssize_t testmode_store(struct device_driver *drv,
-			      const char *buf, size_t count)
+static ssize_t trng_test_mode_store(struct device_driver *drv,
+				    const char *buf, size_t count)
 {
 	try_module_get(THIS_MODULE);
 	if (kstrtoint(buf, 0, &trng_test_mode) < 0) {
@@ -420,7 +420,7 @@ static ssize_t testmode_store(struct device_driver *drv,
 	module_put(THIS_MODULE);
 	return count;
 }
-static DRIVER_ATTR_RW(testmode);
+static DRIVER_ATTR_RW(trng_test_mode);
 
 /**
  * trng_probe
@@ -482,9 +482,9 @@ static int trng_probe(struct platform_device *pdev)
 	set_bit(FLAG_REGISTERED, &dev->flags);
 
 	/* test_mode */
-	rc = driver_create_file(pdev->dev.driver, &driver_attr_testmode);
+	rc = driver_create_file(pdev->dev.driver, &driver_attr_trng_test_mode);
 	if (rc) {
-		pr_info("Can't create testmode?\n");
+		pr_info("Can't create trng_test_mode?\n");
 		goto err;
 	}
 
@@ -504,7 +504,7 @@ static int trng_remove(struct platform_device *pdev)
 {
 	struct trng_dev *dev = dev_get_drvdata(&pdev->dev);
 	/* test_mode */
-	driver_remove_file(pdev->dev.driver, &driver_attr_testmode);
+	driver_remove_file(pdev->dev.driver, &driver_attr_trng_test_mode);
 
 	kref_put(&dev->ref, trng_destroy);
 	return 0;
