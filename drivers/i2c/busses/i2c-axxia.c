@@ -107,7 +107,7 @@
 		u32 bus_clk_rate;
 	};
 
-static void i2c_int_disable(struct axxia_i2c_dev *idev, u32 mask)
+static void i2c_int_disable(struct axxia_i2c_dev *idev, u64 mask)
 {
 	u32 int_en;
 
