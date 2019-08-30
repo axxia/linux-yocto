@@ -375,7 +375,7 @@ apb2ser_indirect_setup(unsigned int region,
 
 	*indirect_offset = ((base + target) * 0x10000);
 	*transfer_width = (target > 0) ? 2 : 4;
-	usleep_range(10, 11);
+	udelay(10);
 
 	return 0;
 }
