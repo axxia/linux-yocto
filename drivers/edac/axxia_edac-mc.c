@@ -214,7 +214,7 @@ static void axxia_sm_error_check(struct edac_device_ctl_info *edac_dev)
 	}
 }
 
-static int axxia_edac_mc_probe(struct platform_device *pdev)
+static inline int axxia_edac_mc_probe(struct platform_device *pdev)
 {
 	static int count;
 	struct axxia_edac_dev_info *dev_info = NULL;
@@ -310,7 +310,7 @@ err1:
 	return 1;
 }
 
-static int axxia_edac_mc_remove(struct platform_device *pdev)
+static inline int axxia_edac_mc_remove(struct platform_device *pdev)
 {
 	platform_device_unregister(pdev);
 	return 0;
