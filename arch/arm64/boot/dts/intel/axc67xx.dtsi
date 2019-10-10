@@ -244,6 +244,7 @@
 			reg = <0x80 0x05020000 0 0x10000>;
 			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
 					<GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+			#dma-cells = <1>;
 			channel0 {
 				interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
 			};
@@ -259,6 +260,7 @@
 			reg = <0x80 0x05030000 0 0x10000>;
 			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
 					<GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+			#dma-cells = <1>;
 			status = "disabled";
 			channel0 {
 				interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
@@ -463,6 +465,8 @@
 				compatible = "arm,pl011", "arm,primecell";
 				reg = <0x80 0x80000000 0 0x10000>;
 				interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+                                dmas = <&gpdma0 8>, <&gpdma0 9>;
+                                dma-names = "rx", "tx";
 				clocks = <&clk_per 0>;
 				clock-names = "apb_pclk";
 				status = "disabled";
@@ -472,6 +476,8 @@
 				compatible = "arm,pl011", "arm,primecell";
 				reg = <0x80 0x80010000 0 0x10000>;
 				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+                                dmas = <&gpdma0 8>, <&gpdma0 9>;
+                                dma-names = "rx", "tx";
 				clocks = <&clk_per 0>;
 				clock-names = "apb_pclk";
 				status = "disabled";
@@ -481,6 +487,8 @@
 				compatible = "arm,pl011", "arm,primecell";
 				reg = <0x80 0x80020000 0 0x10000>;
 				interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+                                dmas = <&gpdma0 8>, <&gpdma0 9>;
+                                dma-names = "rx", "tx";
 				clocks = <&clk_per 0>;
 				clock-names = "apb_pclk";
 				status = "disabled";
@@ -636,6 +644,8 @@
 				#size-cells = <0>;
 				reg = <0x80 0x80100000 0 0x1000>;
 				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+                                dmas = <&gpdma0 8>, <&gpdma0 9>;
+                                dma-names = "rx", "tx";
 				num-cs = <5>;
 				clocks = <&clk_per 0>;
 				clock-names = "apb_pclk";
@@ -649,6 +659,8 @@
 				#size-cells = <0>;
 				reg = <0x80 0x80110000 0 0x1000>;
 				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+                                dmas = <&gpdma0 8>, <&gpdma0 9>;
+                                dma-names = "rx", "tx";
 				num-cs = <5>;
 				clocks = <&clk_per 0>;
 				clock-names = "apb_pclk";
@@ -662,6 +674,8 @@
 				#size-cells = <0>;
 				reg = <0x80 0x80120000 0 0x1000>;
 				interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+                                dmas = <&gpdma0 8>, <&gpdma0 9>;
+                                dma-names = "rx", "tx";
 				num-cs = <5>;
 				clocks = <&clk_per 0>;
 				clock-names = "apb_pclk";
