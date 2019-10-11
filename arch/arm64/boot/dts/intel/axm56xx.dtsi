@@ -60,7 +60,9 @@
 			clock-frequency = <0>; /* Set by the Boot Loader */
 			clock-output-names = "clk_per";
 		};
+                
 	};
+
 
 	gic: interrupt-controller@8010010000 {
 		compatible = "arm,gic-v3";
@@ -190,17 +192,17 @@
 		};
 
 		usb0: usb@9000000000 {
-			compatible = "axxia,axxia-dwc3";
+			compatible = "axxia,axxia-dwc3,snps,dwc3 ";
+                        reg = <0x90 0x00000000 0 0x100000>;
+                        clocks = <&clk_per 0>, <&clk_per 0>, <&clk_per 0>;
+                        clock-names = "ref", "bus_early", "suspend";
 			dma-coherent;
-			status = "disabled";
 			#address-cells = <2>;
 			#size-cells = <2>;
 			ranges;
-			dwc3 {
-				compatible = "snps,dwc3";
-				reg = <0x90 0x00000000 0 0x100000>;
-				interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
-			};
+			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
+			dr_mode = "host";
+			status = "disabled";
 		};
 
 		sata0: sata@a000000000 {
