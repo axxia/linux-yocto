@@ -48,6 +48,8 @@ axxia_dspc_write(struct file *file, const char __user *buffer,
 		 size_t count, loff_t *ppos)
 {
 	char *input;
+	int rc;
+	unsigned long res;
 
 	input = kmalloc(count + 1, __GFP_RECLAIMABLE);
 
@@ -61,7 +63,12 @@ axxia_dspc_write(struct file *file, const char __user *buffer,
 	}
 
 	input[count] = 0;
-	axxia_dspc_set_state(kstrtoul(input, 0, NULL));
+	rc = kstrtoul(input, 0, &res);
+
+	if (rc)
+		return rc;
+
+	axxia_dspc_set_state(res);
 	kfree(input);
 
 	return count;
@@ -104,6 +111,8 @@ axxia_actlr_el3_write(struct file *file, const char __user *buffer,
 		      size_t count, loff_t *ppos)
 {
 	char *input;
+	int rc;
+	unsigned long res;
 
 	input = kmalloc(count + 1, __GFP_RECLAIMABLE);
 
@@ -117,7 +126,12 @@ axxia_actlr_el3_write(struct file *file, const char __user *buffer,
 	}
 
 	input[count] = 0;
-	axxia_actlr_el3_set(kstrtoul(input, 0, NULL));
+	rc = kstrtoul(input, 0, &res);
+
+	if (rc)
+		return rc;
+
+	axxia_actlr_el3_set(res);
 	kfree(input);
 
 	return count;
@@ -160,6 +174,8 @@ axxia_actlr_el2_write(struct file *file, const char __user *buffer,
 		      size_t count, loff_t *ppos)
 {
 	char *input;
+	int rc;
+	unsigned long res;
 
 	input = kmalloc(count + 1, __GFP_RECLAIMABLE);
 
@@ -173,7 +189,12 @@ axxia_actlr_el2_write(struct file *file, const char __user *buffer,
 	}
 
 	input[count] = 0;
-	axxia_actlr_el2_set(kstrtoul(input, 0, NULL));
+	rc = kstrtoul(input, 0, &res);
+
+	if (rc)
+		return rc;
+
+	axxia_actlr_el2_set(res);
 	kfree(input);
 
 	return count;
@@ -219,6 +240,8 @@ axxia_ccn_offset_write(struct file *file, const char __user *buffer,
 {
 	char *input;
 	unsigned int new_ccn_offset;
+	int rc;
+	unsigned long res;
 
 	input = kmalloc(count + 1, __GFP_RECLAIMABLE);
 
@@ -232,8 +255,12 @@ axxia_ccn_offset_write(struct file *file, const char __user *buffer,
 	}
 
 	input[count] = 0;
+	rc = kstrtoul(input, 0, &res);
 
-	new_ccn_offset = (unsigned int)kstrtoul(input, 0, NULL);
+	if (rc)
+		return rc;
+
+	new_ccn_offset = (unsigned int)res;
 
 	if (of_find_compatible_node(NULL, NULL, "axxia,axc6732")) {
 		if (new_ccn_offset > 0x9cff00)
@@ -284,6 +311,8 @@ axxia_ccn_value_write(struct file *file, const char __user *buffer,
 		      size_t count, loff_t *ppos)
 {
 	char *input;
+	int rc;
+	unsigned long res;
 
 	input = kmalloc(count + 1, __GFP_RECLAIMABLE);
 
@@ -297,7 +326,12 @@ axxia_ccn_value_write(struct file *file, const char __user *buffer,
 	}
 
 	input[count] = 0;
-	axxia_ccn_set(ccn_offset, kstrtoul(input, 0, NULL));
+	rc = kstrtoul(input, 0, &res);
+
+	if (rc)
+		return rc;
+
+	axxia_ccn_set(ccn_offset, res);
 	kfree(input);
 
 	return count;
