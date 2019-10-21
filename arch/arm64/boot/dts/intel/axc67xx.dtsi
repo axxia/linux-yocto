@@ -215,32 +215,31 @@
 		};
 
 		usb0: usb@9000000000 {
-			compatible = "axxia,axxia-dwc3,snps,dwc3 ";
-                        reg = <0x90 0x00000000 0 0x100000>;
-                        clocks = <&clk_per 0>, <&clk_per 0>, <&clk_per 0>;
-                        clock-names = "ref", "bus_early", "suspend";
+			compatible = "axxia,axxia-dwc3";
 			dma-coherent;
+			status = "disabled";
 			#address-cells = <2>;
 			#size-cells = <2>;
 			ranges;
-			interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
-			dr_mode = "host";
-			status = "disabled";
+			dwc3 {
+				compatible = "snps,dwc3";
+				reg = <0x90 0x00000000 0 0x100000>;
+				interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
+			};
 		};
 
 		usb1: usb@9800000000 {
-			compatible = "axxia,axxia-dwc3,snps,dwc3 ";
-                        reg = <0x98 0x00000000 0 0x100000>;
-                        clocks = <&clk_per 0>, <&clk_per 0>, <&clk_per 0>;
-                        clock-names = "ref", "bus_early", "suspend";
+			compatible = "axxia,axxia-dwc3";
 			dma-coherent;
+			status = "disabled";
 			#address-cells = <2>;
 			#size-cells = <2>;
 			ranges;
-			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-			dr_mode = "host";
-			status = "disabled";
-
+			dwc3 {
+				compatible = "snps,dwc3";
+				reg = <0x98 0x00000000 0 0x100000>;
+				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+			};
 		};
 
 		gpdma0: gpdma@8005020000 {
