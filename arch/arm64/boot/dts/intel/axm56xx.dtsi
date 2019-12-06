@@ -29,7 +29,7 @@
 
 	aliases {
 		serial0	  = &serial0;
-		serial1   = &serial1;
+		serial1	  = &serial1;
 		serial2	  = &serial2;
 		serial3	  = &serial3;
 		timer	  = &timer0;
@@ -41,10 +41,10 @@
 		gpdma0	  = &gpdma0;
 		gpdma1	  = &gpdma1;
 		edac_cpu  = &edac_cpu;
-		edac_l2  = &edac_l2;
-		edac_l3  = &edac_l3;
-		sm0       = &sm0;
-		sm1       = &sm1;
+		edac_l2	 = &edac_l2;
+		edac_l3	 = &edac_l3;
+		sm0	  = &sm0;
+		sm1	  = &sm1;
 		cm0	  = &cm0;
 		cm1	  = &cm1;
 	};
@@ -75,12 +75,12 @@
 	timer {
 		compatible = "arm,armv8-timer";
 		interrupts = <GIC_PPI 13
-        			(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-                            <GIC_PPI 14
 				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-                            <GIC_PPI 11
+			    <GIC_PPI 14
 				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-                            <GIC_PPI 10
+			    <GIC_PPI 11
+				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+			    <GIC_PPI 10
 				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
 	};
 
@@ -90,8 +90,8 @@
 	};
 
 	psci {
-		compatible      = "arm,psci-0.2";
-		method          = "smc";
+		compatible	= "arm,psci-0.2";
+		method		= "smc";
 	};
 
 	soc {
@@ -101,7 +101,6 @@
 		#size-cells = <2>;
 		interrupt-parent = <&gic>;
 		ranges;
-
 
 		ccn_504: ccn@8000000000 {
 			compatible = "arm,ccn-504";
@@ -190,17 +189,17 @@
 		};
 
 		usb0: usb@9000000000 {
-			compatible = "axxia,axxia-dwc3";
+			compatible = "axxia,axxia-dwc3","snps,dwc3";
 			dma-coherent;
 			status = "disabled";
 			#address-cells = <2>;
 			#size-cells = <2>;
+			clocks = <&clk_per>,<&clk_per>,<&clk_per>;
+			clock-names = "bus_early","ref","suspend";
 			ranges;
-			dwc3 {
-				compatible = "snps,dwc3";
-				reg = <0x90 0x00000000 0 0x100000>;
-				interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
-			};
+			reg = <0x90 0x00000000 0 0x100000>;
+			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
+			dr_mode = "host";
 		};
 
 		sata0: sata@a000000000 {
@@ -320,10 +319,10 @@
 			control-value = <0>;
 			ranges = <0x00000000 0x000000c0 0x40000000
 				0xc0 0x40000000
-				0x00 0x10000000         /* config space */
+				0x00 0x10000000		/* config space */
 				0x03000000 0x00000000 0xa0000000
 				0xc0 0x00000000
-				0x00 0x40000000>;       /* outbound mem */
+				0x00 0x40000000>;	/* outbound mem */
 			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>,
 				<GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>,
 				<GIC_SPI 97 IRQ_TYPE_EDGE_RISING>,
@@ -376,10 +375,10 @@
 			control-value = <0>;
 			ranges = <0x00000000 0x000000c8 0x40000000
 				0xc8 0x40000000
-				0x00 0x10000000         /* config space */
+				0x00 0x10000000		/* config space */
 				0x03000000 0x00000000 0xa0000000
 				0xc8 0x00000000
-				0x00 0x40000000>;       /* outbound mem */
+				0x00 0x40000000>;	/* outbound mem */
 			interrupt-map-mask = <0 0 0 7>;
 			interrupt-map = <0 0 0 1 &gic 0 92 4>,
 					<0 0 0 2 &gic 0 92 4>,
@@ -404,10 +403,10 @@
 			control-value = <0>;
 			ranges = <0x00000000 0x000000d0 0x40000000
 				0xd0 0x40000000
-				0x00 0x10000000         /* config space */
+				0x00 0x10000000		/* config space */
 				0x03000000 0x00000000 0xa0000000
 				0xd0 0x00000000
-				0x00 0x40000000>;       /* outbound mem */
+				0x00 0x40000000>;	/* outbound mem */
 			interrupt-map-mask = <0 0 0 7>;
 			interrupt-map = <0 0 0 1 &gic 0 93 4>,
 					<0 0 0 2 &gic 0 93 4>,
@@ -460,8 +459,8 @@
 				compatible = "arm,pl011", "arm,primecell";
 				reg = <0x80 0x80000000 0 0x10000>;
 				interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-                                dmas = <&gpdma0 8>, <&gpdma0 9>;
-                                dma-names = "rx", "tx";
+				dmas = <&gpdma0 8>, <&gpdma0 9>;
+				dma-names = "rx", "tx";
 				clocks = <&clk_per 0>;
 				clock-names = "apb_pclk";
 				status = "disabled";
@@ -471,8 +470,8 @@
 				compatible = "arm,pl011", "arm,primecell";
 				reg = <0x80 0x80010000 0 0x10000>;
 				interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-                                dmas = <&gpdma0 8>, <&gpdma0 9>;
-                                dma-names = "rx", "tx";
+				dmas = <&gpdma0 8>, <&gpdma0 9>;
+				dma-names = "rx", "tx";
 				clocks = <&clk_per 0>;
 				clock-names = "apb_pclk";
 				status = "disabled";
@@ -482,8 +481,8 @@
 				compatible = "arm,pl011", "arm,primecell";
 				reg = <0x80 0x80020000 0 0x10000>;
 				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-                                dmas = <&gpdma0 8>, <&gpdma0 9>;
-                                dma-names = "rx", "tx";
+				dmas = <&gpdma0 8>, <&gpdma0 9>;
+				dma-names = "rx", "tx";
 				clocks = <&clk_per 0>;
 				clock-names = "apb_pclk";
 				status = "disabled";
@@ -493,8 +492,8 @@
 				compatible = "arm,pl011", "arm,primecell";
 				reg = <0x80 0x80030000 0 0x10000>;
 				interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-                                dmas = <&gpdma0 8>, <&gpdma0 9>;
-                                dma-names = "rx", "tx";
+				dmas = <&gpdma0 8>, <&gpdma0 9>;
+				dma-names = "rx", "tx";
 				clocks = <&clk_per 0>;
 				clock-names = "apb_pclk";
 				status = "disabled";
