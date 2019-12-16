@@ -652,6 +652,7 @@
 				clocks = <&clk_per 0>;
 				clock-names = "apb_pclk";
 				status = "disabled";
+				enable-dma = <0>;
 			};
 
 			spi1: ssp@8080110000 {
@@ -665,6 +666,7 @@
 				clocks = <&clk_per 0>;
 				clock-names = "apb_pclk";
 				status = "disabled";
+				enable-dma = <0>;
 			};
 
 			spi2: ssp@8080120000 {
@@ -678,6 +680,7 @@
 				clocks = <&clk_per 0>;
 				clock-names = "apb_pclk";
 				status = "disabled";
+				enable-dma = <0>;
 			};
 		};
 	};

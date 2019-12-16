@@ -561,6 +561,7 @@
 				clocks = <&clk_per 0>;
 				clock-names = "apb_pclk";
 				status = "disabled";
+				enable-dma = <0>;
 			};
 		};
 	};
