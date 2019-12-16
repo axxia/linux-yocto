@@ -441,8 +441,7 @@
 				#size-cells = <0>;
 				reg = <0x20 0x10088000 0x00 0x1000>;
 				interrupts = <0 42 4>;
-                                dmas = <&gpdma0 8>, <&gpdma0 9>;
-                                dma-names = "rx", "tx";
+				enable-dma = <0>;
 				num-cs = <5>;
 				cs-gpios = <&spics 0 1>,
 					   <&spics 1 1>,
