@@ -60,6 +60,10 @@ static int axxia_dwc3_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	driver_data = of_device_get_match_data(dev);
+
+	if (!driver_data)
+		return -ENODEV;
+
 	adwc->dev = dev;
 	adwc->num_clks = driver_data->num_clks;
 	adwc->clk_names = (const char **)driver_data->clk_names;
