@@ -68,8 +68,11 @@ axxia_dspc_write(struct file *file, const char __user *buffer,
 	input[count] = 0;
 	rc = kstrtoul(input, 0, &res);
 
-	if (rc)
+	if (rc) {
+		kfree(input);
+
 		return rc;
+	}
 
 	axxia_dspc_set_state(res);
 	kfree(input);
@@ -131,8 +134,11 @@ axxia_actlr_el3_write(struct file *file, const char __user *buffer,
 	input[count] = 0;
 	rc = kstrtoul(input, 0, &res);
 
-	if (rc)
+	if (rc) {
+		kfree(input);
+
 		return rc;
+	}
 
 	axxia_actlr_el3_set(res);
 	kfree(input);
@@ -194,8 +200,11 @@ axxia_actlr_el2_write(struct file *file, const char __user *buffer,
 	input[count] = 0;
 	rc = kstrtoul(input, 0, &res);
 
-	if (rc)
+	if (rc) {
+		kfree(input);
+
 		return rc;
+	}
 
 	axxia_actlr_el2_set(res);
 	kfree(input);
@@ -311,6 +320,10 @@ enable_ccn_access(void)
 	*/
 
 	value = kmalloc(sizeof(unsigned long), GFP_ATOMIC);
+
+	if (!value)
+		return -ENOMEM;
+
 	*value = 1;
 	__flush_dcache_area(value, sizeof(unsigned long));
 	mb();
@@ -452,8 +465,11 @@ axxia_ccn_offset_write(struct file *file, const char __user *buffer,
 	input[count] = 0;
 	rc = kstrtoul(input, 0, &res);
 
-	if (rc)
+	if (rc) {
+		kfree(input);
+
 		return rc;
+	}
 
 	new_ccn_offset = (unsigned int)res;
 
@@ -523,8 +539,11 @@ axxia_ccn_value_write(struct file *file, const char __user *buffer,
 	input[count] = 0;
 	rc = kstrtoul(input, 0, &res);
 
-	if (rc)
+	if (rc) {
+		kfree(input);
+
 		return rc;
+	}
 
 	axxia_ccn_set(ccn_offset, res);
 	kfree(input);
