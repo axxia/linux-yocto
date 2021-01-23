@@ -856,6 +856,8 @@ nemac_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *s)
 {
 	struct nemac_priv *priv = netdev_priv(dev);
 
+	memset(s, 0, sizeof(struct rtnl_link_stats64));
+
 	if (nemac_stats_snapshot(priv) <= 0)
 		return;
 
@@ -1088,6 +1090,9 @@ nemac_alloc_dma_ring(struct device *dev, struct queue_ptr *q, u32 num_descr,
 	q->head = q->tail;
 	q->size = num_descr * sizeof(struct dma_desc);
 	q->ring = dma_alloc_coherent(dev, q->size, &q->phys_addr, GFP_KERNEL);
+	if (!q->ring)
+		return -ENOMEM;
+
 	for (i = 0; i < num_descr; ++i)
 		desc_set_idx(&q->ring[i], i);
 	q->skb = kmalloc_array(num_descr, sizeof(void *), GFP_KERNEL);
