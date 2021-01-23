@@ -710,7 +710,7 @@ static ssize_t mpr1_dump_show(struct edac_device_ctl_info
 	raw_spin_unlock_irqrestore(&dev_info->data->mpr_data_lock, flags);
 
 	/* Now process on copied data ... */
-	count = scnprintf(buf + total_count, PAGE_SIZE - total_count,
+	count = scnprintf(buf + total_count, PAGE_SIZE - total_count - 1,
 			  "%s", MPR_HDR9);
 
 	total_count += (count > 0 ? count : 0);
@@ -727,7 +727,7 @@ static ssize_t mpr1_dump_show(struct edac_device_ctl_info
 
 		/* x8 base */
 		count = scnprintf(buf + total_count,
-				  PAGE_SIZE - total_count,
+				  PAGE_SIZE - total_count - 1,
 				  MPR_FMT9, i + 1,
 				  *((u32 *)&mpr_page1[j][0]),
 				  *((u32 *)&mpr_page1[j][1]),
@@ -744,7 +744,7 @@ static ssize_t mpr1_dump_show(struct edac_device_ctl_info
 		/* x16 addition */
 		if (dev_info->data->dram_count == MAX_DQ) {
 			count = scnprintf(buf + total_count,
-					  PAGE_SIZE - total_count,
+					  PAGE_SIZE - total_count - 1,
 					  MPR_FMT16,
 					  *((u32 *)&mpr_page1[j][9]),
 					  *((u32 *)&mpr_page1[j][10]),
@@ -760,7 +760,7 @@ static ssize_t mpr1_dump_show(struct edac_device_ctl_info
 		}
 	}
 
-	total_count = scnprintf(data, PAGE_SIZE, "%s\n", buf);
+	total_count = scnprintf(data, PAGE_SIZE - 1, "%s\n", buf);
 
 	/* free resourses */
 	kfree(mpr_page1);
