@@ -328,6 +328,9 @@ static int intel_edac_l3_probe(struct platform_device *pdev)
 	dev_info->edac_idx = edac_device_alloc_index();
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!r)
+		return -ENOMEM;
+
 	dev_info->dickens_L3 = devm_ioremap(&pdev->dev, r->start,
 					    resource_size(r));
 	if (IS_ERR(dev_info->dickens_L3))
