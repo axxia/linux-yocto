@@ -214,6 +214,7 @@ static int axmperf_probe(struct platform_device *dev)
 		return -ENOMEM;
 
 	axm_pmu->pmu = (struct pmu) {
+		.task_ctx_nr = perf_invalid_context,
 		.attr_groups = 0,
 		.event_init = platform_pmu_event_init,
 		.add = platform_pmu_event_add,

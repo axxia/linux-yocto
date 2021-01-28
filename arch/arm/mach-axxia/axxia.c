@@ -145,7 +145,7 @@ static struct resource axxia_pmu_resources[] = {
 };
 
 static struct platform_device pmu_device = {
-	.name			= "arm-pmu",
+	.name			= "armv7-pmu",
 	.id			= -1,
 	.num_resources		= ARRAY_SIZE(axxia_pmu_resources),
 	.resource		= axxia_pmu_resources,
