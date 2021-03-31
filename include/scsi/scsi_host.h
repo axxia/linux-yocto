@@ -419,11 +419,6 @@ struct scsi_host_template {
 	unsigned supported_mode:2;
 
 	/*
-	 * True if this host adapter uses unchecked DMA onto an ISA bus.
-	 */
-	unsigned unchecked_isa_dma:1;
-
-	/*
 	 * True for emulated SCSI host adapters (e.g. ATAPI).
 	 */
 	unsigned emulated:1;
@@ -611,7 +606,6 @@ struct Scsi_Host {
 	 */
 	unsigned nr_hw_queues;
 	unsigned active_mode:2;
-	unsigned unchecked_isa_dma:1;
 
 	/*
 	 * Host has requested that no further requests come through for the
