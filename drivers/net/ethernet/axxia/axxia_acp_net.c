@@ -806,23 +806,11 @@ static int appnic_open(struct net_device *dev)
 	struct appnic_device *pdata = netdev_priv(dev);
 	int return_code = 0;
 
-	pdata->phy_dev = of_phy_connect(pdata->netdev, pdata->phy_dn,
-					appnic_handle_link_change, 0,
-					PHY_INTERFACE_MODE_MII);
-
-	if (IS_ERR_OR_NULL(pdata->phy_dev)) {
-		netdev_err(dev, "Could not attach to PHY\n");
-		return -ENODEV;
-	}
-
-	pr_debug("[%s] (phy %s)\n",
-		 pdata->phy_dev->drv->name, dev_name(pdata->dev));
+	/* Bring the PHY up. */
+	phy_start(pdata->phy_dev);
 
 	/* Enable NAPI. */
 	napi_enable(&pdata->napi);
-
-	/* Bring the PHY up. */
-	phy_start(pdata->phy_dev);
 
 	/* Install the interrupt handlers. */
 	return_code =
@@ -1756,6 +1744,18 @@ static int appnic_drv_probe(struct platform_device *pdev)
 		rc = -ENODEV;
 		goto err_nodev;
 	}
+
+	pdata->phy_dev = of_phy_connect(pdata->netdev, pdata->phy_dn,
+					appnic_handle_link_change, 0,
+					PHY_INTERFACE_MODE_MII);
+
+	if (IS_ERR_OR_NULL(pdata->phy_dev)) {
+		pr_err("Could not attach to PHY\n");
+		return -ENODEV;
+	}
+
+	pr_debug("[%s] (phy %s)\n",
+		 pdata->phy_dev->drv->name, dev_name(pdata->dev));
 
 	return 0;
 
