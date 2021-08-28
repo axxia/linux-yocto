@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
 
-/* drivers/net/ethernet/axxia/axxia_acp_net.c */
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/version.h>
@@ -36,8 +34,9 @@
 #include <linux/crc32.h>
 #include <linux/phy_fixed.h>
 #include <net/ip.h>
-
 #include <asm/dma.h>
+#define CREATE_TRACE_POINTS
+#include <trace/events/femac.h>
 
 #include "axxia_acp_net.h"
 
@@ -518,6 +517,8 @@ static void axxianet_rx_packet(struct net_device *dev)
 	unsigned long ok_stat = 0, overflow_stat = 0;
 	unsigned long crc_stat = 0, align_stat = 0;
 	union appnic_queue_pointer queue;
+	int queue_loops = 0;
+	int detected_overrun = 0;
 
 	readdescriptor(((unsigned long)pdata->rx_desc +
 			pdata->rx_tail_copy.bits.offset), &descriptor);
@@ -530,6 +531,8 @@ static void axxianet_rx_packet(struct net_device *dev)
 		pdata->stats.rx_dropped++;
 		return;
 	}
+
+	trace_rx_packet_start(skb_tailroom(sk_buff), descriptor.pdu_length);
 
 	/* Needs to be reviewed. This fixed an alignment
 	 * exception when pinging to the target from a host.
@@ -548,6 +551,11 @@ static void axxianet_rx_packet(struct net_device *dev)
 	queue = swab_queue_pointer(pdata->rx_tail);
 	while (queue_initialized(queue, pdata->rx_tail_copy,
 				 pdata->rx_num_desc) > 0) {
+		queue_loops++;
+
+		trace_rx_packet_loop(skb_tailroom(sk_buff),
+				     descriptor.pdu_length, queue_loops);
+
 		if (skb_tailroom(sk_buff) >= descriptor.pdu_length) {
 			unsigned char *buffer;
 
@@ -562,22 +570,36 @@ static void axxianet_rx_packet(struct net_device *dev)
 					   descriptor.pdu_length,
 					   bytes_copied,
 					   descriptor.error);
+
+			trace_rx_packet_pdu_overrun(bytes_copied,
+						    (unsigned int *)&descriptor);
+			detected_overrun = 1;
+			ftrace_dump(DUMP_ALL);
 		}
 		bytes_copied += descriptor.pdu_length;
 		descriptor.data_transfer_length = pdata->rx_buf_per_desc;
 		writedescriptor(((unsigned long)pdata->rx_desc +
 					pdata->rx_tail_copy.bits.offset),
 				&descriptor);
-		if (descriptor.error != 0)
+		if (descriptor.error != 0) {
 			error_num = 1;
+			trace_rx_packet_error(1);
+		}
+
 		queue_increment(&pdata->rx_tail_copy, pdata->rx_num_desc);
-		if (descriptor.end_of_packet != 0)
+		if (descriptor.end_of_packet != 0) {
+			if (detected_overrun != 0)
+				trace_rx_packet_overrun_eop(bytes_copied);
+
 			break;
+		}
 		readdescriptor(((unsigned long)pdata->rx_desc +
 					pdata->rx_tail_copy.bits.offset),
 			       &descriptor);
 		queue = swab_queue_pointer(pdata->rx_tail);
 	}
+
+	trace_rx_packet_finish(queue_loops);
 
 	if (descriptor.end_of_packet == 0) {
 		pr_err("%s: No end of packet! %lu/%lu/%lu/%lu\n",
@@ -628,6 +650,7 @@ static int axxianet_rx_packets(struct net_device *dev, int max)
 	new_queue.raw = pdata->rx_tail_copy.raw;
 
 	/* Receive Packets */
+	trace_rx_packets_start(max);
 
 	orig_queue = swab_queue_pointer(pdata->rx_tail);
 	while (queue_initialized(orig_queue, new_queue,
@@ -650,6 +673,8 @@ static int axxianet_rx_packets(struct net_device *dev, int max)
 		}
 		orig_queue = swab_queue_pointer(pdata->rx_tail);
 	}
+
+	trace_rx_packets_finish(packets);
 
 	/* Update the Head Pointer */
 
@@ -1612,6 +1637,7 @@ static int appnic_drv_probe(struct platform_device *pdev)
 
 	pr_info("%s: INTEL(R) 10/100 Network Driver - version %s\n",
 		AXXIA_DRV_NAME, AXXIA_DRV_VERSION);
+	dev_info(&pdev->dev, "JURA: PDU overrun tracing enabled\n");
 
 	/* Allocate space for the device. */
 
