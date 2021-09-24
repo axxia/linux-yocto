@@ -1,26 +1,25 @@
 config AXXIA_NET
-	bool "INTEL Axxia ACP34XX Ethernet support"
+	bool "INTEL Axxia AXM55XX Ethernet support"
 	depends on ARM || 44x
 	select MII
 	select PHYLIB
 	default y
 	help
-	  Network interface driver for INTEL Axxia's 3000 and 5500
-	  series boards.
+	  Network interface driver for INTEL Axxia's 5500 series boards.
 
 if AXXIA_NET
 
 config AXXIA_NET_NUM_RX_DESC
 	int "INTEL Axxia Network Driver: Number of receive descriptors"
 	depends on AXXIA_NET
-	default "4"
+	default "32"
 	help
           The number of receive descriptors to allocate.
 
 config AXXIA_NET_RX_BUF_SZ
 	int "NIC driver: Size of the receive buffer"
 	depends on AXXIA_NET
-	default "32768"
+	default "524288"
 	help
           The size of the receive buffer.
 

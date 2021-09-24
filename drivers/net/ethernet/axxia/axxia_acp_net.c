@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
+// Copyright (C) 2021 INTEL Corporation
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -12,7 +13,6 @@
 #include <linux/spinlock.h>
 #include <linux/delay.h>
 #include <linux/bitops.h>
-#include <linux/proc_fs.h>
 #include <linux/platform_device.h>
 #include <linux/netdevice.h>
 #include <linux/mii.h>
@@ -39,6 +39,8 @@
 #include <trace/events/femac.h>
 
 #include "axxia_acp_net.h"
+
+static void axxianet_reset(struct net_device *);
 
 /*******************************************************************************
  *  1) This driver is used by both ACP (PPC) and AXM (ARM) platforms.
@@ -91,22 +93,16 @@ MODULE_LICENSE("GPL");
  * Called periodically when PHY is in polling mode.
  */
 
-static void appnic_handle_link_change(struct net_device *dev)
+static void appnic_handle_link_change(struct net_device *ndev)
 {
-	struct appnic_device *pdata = netdev_priv(dev);
+	struct appnic_device *pdata = netdev_priv(ndev);
 	struct phy_device *phydev = pdata->phy_dev;
 	int status_change = 0;
 	unsigned long rx_configuration;
 	unsigned long tx_configuration = 0;
 
 	rx_configuration =
-#ifdef CONFIG_ARM
 		APPNIC_RX_CONF_STRIPCRC;
-#else
-		(APPNIC_RX_CONF_STRIPCRC |
-		 APPNIC_RX_CONF_RXFCE |
-		 APPNIC_RX_CONF_TXFCE);
-#endif
 	tx_configuration =
 		(APPNIC_TX_CONF_ENABLE_SWAP_SA |
 		 APPNIC_TX_CONF_APP_CRC_ENABLE |
@@ -147,14 +143,14 @@ static void appnic_handle_link_change(struct net_device *dev)
 
 	if (status_change) {
 		if (phydev->link) {
-			netif_carrier_on(dev);
-			netdev_info(dev, "link up (%d/%s)\n",
+			netif_carrier_on(ndev);
+			netdev_info(ndev, "link up (%d/%s)\n",
 				    phydev->speed,
 				    phydev->duplex == DUPLEX_FULL ?
 				    "Full" : "Half");
 		} else {
-			netif_carrier_off(dev);
-			netdev_info(dev, "link down\n");
+			netif_carrier_off(ndev);
+			netdev_info(ndev, "link down\n");
 		}
 
 		if (rx_configuration != read_mac(APPNIC_RX_CONF))
@@ -306,6 +302,8 @@ static void clear_statistics(struct appnic_device *pdata)
 	 * stats.rx_compressed - Not maintained by this driver.
 	 * stats.tx_compressed - Not maintained by this driver.
 	 */
+
+	pdata->not_for_us = 0;
 }
 
 /* ----------------------------------------------------------------------
@@ -350,13 +348,8 @@ static void get_hw_statistics(struct appnic_device *pdata)
 
 	spin_lock_irqsave(&pdata->dev_lock, flags);
 
-	pdata->stats.rx_dropped = 0;
-	pdata->stats.rx_over_errors = 0;
-
 	/* Update the cumulative rx_errors. */
 	pdata->stats.rx_errors += (rx_under + rx_over);
-
-	pdata->stats.tx_aborted_errors = 0;
 
 	/* Update the cumulative tx_errors. */
 	pdata->stats.tx_errors += tx_under;
@@ -507,7 +500,7 @@ static void handle_transmit_interrupt(struct net_device *dev)
  * axxianet_rx_packet
  */
 
-static void axxianet_rx_packet(struct net_device *dev)
+static int axxianet_rx_packet(struct net_device *dev)
 {
 	struct appnic_device *pdata = netdev_priv(dev);
 	struct appnic_dma_descriptor descriptor;
@@ -519,6 +512,7 @@ static void axxianet_rx_packet(struct net_device *dev)
 	union appnic_queue_pointer queue;
 	int queue_loops = 0;
 	int detected_overrun = 0;
+	struct device *d = &dev->dev;
 
 	readdescriptor(((unsigned long)pdata->rx_desc +
 			pdata->rx_tail_copy.bits.offset), &descriptor);
@@ -526,10 +520,10 @@ static void axxianet_rx_packet(struct net_device *dev)
 	sk_buff = netdev_alloc_skb(dev, AXXIANET_MAX_MTU);
 
 	if (sk_buff == (struct sk_buff *)0) {
-		pr_info_ratelimited("%s: No buffer, packet dropped.\n",
-				    AXXIA_DRV_NAME);
+		dev_info_ratelimited(d,
+				     "packet dropped (no buffer available)\n");
 		pdata->stats.rx_dropped++;
-		return;
+		return 0;
 	}
 
 	trace_rx_packet_start(skb_tailroom(sk_buff), descriptor.pdu_length);
@@ -565,16 +559,17 @@ static void axxianet_rx_packet(struct net_device *dev)
 				 pdata->dma_alloc_offset_rx),
 			       descriptor.pdu_length);
 		} else {
-			pr_err_ratelimited("%s: PDU overrun (%u/%u, %d)\n",
-					   AXXIA_DRV_NAME,
-					   descriptor.pdu_length,
-					   bytes_copied,
-					   descriptor.error);
+			dev_err_ratelimited(d, "%s: PDU overrun (%u/%u, %d)\n",
+					    AXXIA_DRV_NAME,
+					    descriptor.pdu_length,
+					    bytes_copied,
+					    descriptor.error);
 
 			trace_rx_packet_pdu_overrun(bytes_copied,
 						    (unsigned int *)&descriptor);
 			detected_overrun = 1;
 			ftrace_dump(DUMP_ALL);
+			return -1; /* Indicate that NIC should be reset! */
 		}
 		bytes_copied += descriptor.pdu_length;
 		descriptor.data_transfer_length = pdata->rx_buf_per_desc;
@@ -602,15 +597,16 @@ static void axxianet_rx_packet(struct net_device *dev)
 	trace_rx_packet_finish(queue_loops);
 
 	if (descriptor.end_of_packet == 0) {
-		pr_err("%s: No end of packet! %lu/%lu/%lu/%lu\n",
-		       AXXIA_DRV_NAME, ok_stat, overflow_stat,
-		       crc_stat, align_stat);
+		dev_err(d, "%s: No end of packet! %lu/%lu/%lu/%lu\n",
+			AXXIA_DRV_NAME, ok_stat, overflow_stat,
+			crc_stat, align_stat);
 		dev_kfree_skb(sk_buff);
-		return;
+		return -1;    /* Indicate that NIC should be reset! */
 	} else if (error_num == 0) {
 		struct ethhdr *ethhdr = (struct ethhdr *)sk_buff->data;
 
-		if (mac_addr_valid(dev, &ethhdr->h_dest[0])) {
+		if (pdata->promiscuous_mode != 0 ||
+		    mac_addr_valid(dev, &ethhdr->h_dest[0])) {
 			pdata->stats.rx_bytes += bytes_copied;
 			++pdata->stats.rx_packets;
 			sk_buff->dev = dev;
@@ -619,6 +615,10 @@ static void axxianet_rx_packet(struct net_device *dev)
 			if (netif_receive_skb(sk_buff) == NET_RX_DROP)
 				++pdata->dropped_by_stack;
 		} else {
+			dev_warn_once(d, "packet not for us dropped\n");
+			++pdata->stats.rx_dropped;
+			++pdata->not_for_us;
+			trace_rx_packet_not_for_us(pdata->not_for_us);
 			dev_kfree_skb(sk_buff);
 		}
 	} else {
@@ -627,13 +627,23 @@ static void axxianet_rx_packet(struct net_device *dev)
 		pdata->stats.rx_errors +=
 			(overflow_stat + crc_stat + align_stat);
 
-		if (overflow_stat != 0)
+		if (descriptor.end_of_packet == 0 && ok_stat != 0) {
+			dev_warn_ratelimited(d,
+					     "%lu packet(s) dropped\n", ok_stat);
+			pdata->stats.rx_dropped += ok_stat;
+		} else if (overflow_stat != 0) {
+			dev_err(d, "%lu overflow(s)\n", overflow_stat);
 			pdata->stats.rx_fifo_errors += overflow_stat;
-		else if (crc_stat != 0)
+		} else if (crc_stat != 0) {
+			dev_err(d, "%lu crc error(s)\n", crc_stat);
 			pdata->stats.rx_crc_errors += crc_stat;
-		else if (align_stat != 0)
+		} else if (align_stat != 0) {
+			dev_err(d, "%lu crc error(s)\n", crc_stat);
 			pdata->stats.rx_frame_errors += align_stat;
+		}
 	}
+
+	return 0;
 }
 
 /* ----------------------------------------------------------------------
@@ -646,6 +656,7 @@ static int axxianet_rx_packets(struct net_device *dev, int max)
 	union appnic_queue_pointer orig_queue, new_queue;
 	int updated_head_pointer = 0;
 	int packets = 0;
+	int rc;
 
 	new_queue.raw = pdata->rx_tail_copy.raw;
 
@@ -662,7 +673,14 @@ static int axxianet_rx_packets(struct net_device *dev, int max)
 				&descriptor);
 
 		if (descriptor.end_of_packet != 0) {
-			axxianet_rx_packet(dev);
+			rc = axxianet_rx_packet(dev);
+
+			if (unlikely(rc == -1)) {
+				axxianet_reset(dev);
+
+				return 0;
+			}
+
 			packets++;
 			new_queue.raw = pdata->rx_tail_copy.raw;
 
@@ -830,6 +848,7 @@ static int appnic_open(struct net_device *dev)
 {
 	struct appnic_device *pdata = netdev_priv(dev);
 	int return_code = 0;
+	struct device *d = &dev->dev;
 
 	/* Bring the PHY up. */
 	phy_start(pdata->phy_dev);
@@ -841,8 +860,8 @@ static int appnic_open(struct net_device *dev)
 	return_code =
 		request_irq(dev->irq, appnic_isr, 0x00, AXXIA_DRV_NAME, dev);
 	if (return_code != 0) {
-		pr_err("%s: request_irq() failed, returned 0x%x/%d\n",
-		       AXXIA_DRV_NAME, return_code, return_code);
+		dev_err(d, "request_irq() failed, returned 0x%x/%d\n",
+			return_code, return_code);
 		return return_code;
 	}
 
@@ -865,26 +884,27 @@ static int appnic_open(struct net_device *dev)
  * down; operations performed at open time should be reversed.
  */
 
-static int appnic_stop(struct net_device *dev)
+static int appnic_stop(struct net_device *ndev)
 {
-	struct appnic_device *pdata = netdev_priv(dev);
+	struct appnic_device *pdata = netdev_priv(ndev);
+	struct device *dev = &ndev->dev;
 
-	pr_info("%s: Stopping the interface.\n", AXXIA_DRV_NAME);
+	dev_info(dev, "Stopping the interface.\n");
 
 	/* Disable interrupts. Note that disable_irq() will wait for
 	 * any interrupt handlers that are currently executing to
 	 * complete.
 	 */
 	write_mac(0, APPNIC_DMA_INTERRUPT_ENABLE);
-	disable_irq(dev->irq);
-	free_irq(dev->irq, dev);
+	disable_irq(ndev->irq);
+	free_irq(ndev->irq, ndev);
 
 	/* Indicate to the OS that no more packets should be sent.  */
-	netif_stop_queue(dev);
+	netif_stop_queue(ndev);
 	napi_disable(&pdata->napi);
 
 	/* Stop the receiver and transmitter. */
-	disable_rx_tx(dev);
+	disable_rx_tx(ndev);
 
 	/* Bring the PHY down. */
 	if (pdata->phy_dev)
@@ -913,6 +933,7 @@ static int appnic_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	int buf_per_desc;
 	union appnic_queue_pointer queue;
 	unsigned long flags;
+	struct device *d = &dev->dev;
 
 	spin_lock_irqsave(&pdata->tx_lock, flags);
 
@@ -994,8 +1015,7 @@ static int appnic_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	} else {
 		pdata->out_of_tx_descriptors++;
-		pr_err("%s: No transmit descriptors available!\n",
-		       AXXIA_DRV_NAME);
+		dev_err(d, "No transmit descriptors available!\n");
 		spin_unlock_irqrestore(&pdata->tx_lock, flags);
 		return NETDEV_TX_BUSY;
 	}
@@ -1057,6 +1077,27 @@ static int appnic_set_mac_address(struct net_device *dev, void *data)
 	memcpy(dev->dev_addr, address->sa_data, dev->addr_len);
 
 	return 0;
+}
+
+/* ----------------------------------------------------------------------
+ * appnic_set_rx_mode
+ */
+
+static void appnic_set_rx_mode(struct net_device *dev)
+{
+	struct appnic_device *pdata = netdev_priv(dev);
+	unsigned long dev_flags;
+
+	/* Acquire the lock. */
+	spin_lock_irqsave(&pdata->dev_lock, dev_flags);
+
+	if (dev->flags & IFF_PROMISC)
+		pdata->promiscuous_mode = 1;
+	else
+		pdata->promiscuous_mode = 0;
+
+	/* Release the lock */
+	spin_unlock_irqrestore(&pdata->dev_lock, dev_flags);
 }
 
 /* ======================================================================
@@ -1197,7 +1238,7 @@ static const struct net_device_ops appnic_netdev_ops = {
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_poll_controller = appnic_poll_controller,
 #endif
-
+	.ndo_set_rx_mode = appnic_set_rx_mode,
 };
 
 /* ----------------------------------------------------------------------
@@ -1214,6 +1255,7 @@ int appnic_init(struct net_device *dev)
 	struct sockaddr address;
 	unsigned long node_cfg;
 	int rc = 0;
+	struct device *d = &dev->dev;
 
 	/* Set FEMAC to uncached */
 	femac_uncache(pdata);
@@ -1227,8 +1269,8 @@ int appnic_init(struct net_device *dev)
 	/* fixup num_[rt]x_desc. */
 
 	if (0 != (rx_num_desc % DESCRIPTOR_GRANULARITY)) {
-		pr_err("%s: rx_num_desc was not a multiple of %d.\n",
-		       AXXIA_DRV_NAME, DESCRIPTOR_GRANULARITY);
+		dev_err(d, "rx_num_desc was not a multiple of %d.\n",
+			DESCRIPTOR_GRANULARITY);
 		rc = -EINVAL;
 		goto err_param;
 	}
@@ -1236,8 +1278,8 @@ int appnic_init(struct net_device *dev)
 	pdata->rx_num_desc = rx_num_desc;
 
 	if (0 != (tx_num_desc % DESCRIPTOR_GRANULARITY)) {
-		pr_err("%s: tx_num_desc was not a multiple of %d.\n",
-		       AXXIA_DRV_NAME, DESCRIPTOR_GRANULARITY);
+		dev_err(d, "tx_num_desc was not a multiple of %d.\n",
+			DESCRIPTOR_GRANULARITY);
 		rc = -EINVAL;
 		goto err_param;
 	}
@@ -1249,8 +1291,8 @@ int appnic_init(struct net_device *dev)
 	 */
 
 	if (0 != (rx_buf_sz % (BUFFER_ALIGNMENT * rx_num_desc))) {
-		pr_err("%s: rx_buf_sz was not a multiple of %d.\n",
-		       AXXIA_DRV_NAME, (BUFFER_ALIGNMENT * rx_num_desc));
+		dev_err(d, "rx_buf_sz was not a multiple of %d.\n",
+			(BUFFER_ALIGNMENT * rx_num_desc));
 		rc = -EINVAL;
 		goto err_param;
 	}
@@ -1258,8 +1300,8 @@ int appnic_init(struct net_device *dev)
 	pdata->rx_buf_sz = rx_buf_sz;
 
 	if (0 != (tx_buf_sz % (BUFFER_ALIGNMENT * tx_num_desc))) {
-		pr_err("%s: tx_buf_sz was not a multiple of %d.\n",
-		       AXXIA_DRV_NAME, (BUFFER_ALIGNMENT * tx_num_desc));
+		dev_err(d, "tx_buf_sz was not a multiple of %d.\n",
+			(BUFFER_ALIGNMENT * tx_num_desc));
 		rc = -EINVAL;
 		goto err_param;
 	}
@@ -1293,10 +1335,9 @@ int appnic_init(struct net_device *dev)
 		(pdata->tx_buf_sz) + (BUFFER_ALIGNMENT);
 
 	/* Allocate the buffers. */
-
 	rc = femac_alloc_mem_buffers(dev);
 	if (rc != 0) {
-		pr_err("%s: Can't allocate DMA-able memory!\n", AXXIA_DRV_NAME);
+		dev_err(d, "Can't allocate DMA-able memory!\n");
 		goto err_mem_buffers;
 	}
 
@@ -1307,8 +1348,7 @@ int appnic_init(struct net_device *dev)
 	pdata->rx_tail = (union appnic_queue_pointer *)dma_offset;
 	pdata->rx_tail_dma = (int)pdata->rx_tail - (int)pdata->dma_alloc_offset;
 	dma_offset += sizeof(union appnic_queue_pointer);
-	memset((void *)pdata->rx_tail, 0,
-	       sizeof(union appnic_queue_pointer));
+	memset((void *)pdata->rx_tail, 0, sizeof(union appnic_queue_pointer));
 
 	pdata->tx_tail = (union appnic_queue_pointer *)dma_offset;
 	pdata->tx_tail_dma = (int)pdata->tx_tail - (int)pdata->dma_alloc_offset;
@@ -1381,6 +1421,9 @@ int appnic_init(struct net_device *dev)
 		buf += pdata->tx_buf_per_desc;
 	}
 
+	/* Set promiscuous mode to off. */
+	pdata->promiscuous_mode = 0;
+
 	/* Initialize the spinlocks. */
 
 	spin_lock_init(&pdata->dev_lock);
@@ -1410,23 +1453,18 @@ int appnic_init(struct net_device *dev)
 	write_mac(0x1, APPNIC_RX_EXTERNAL_INTERRUPT_CONTROL);
 	write_mac(0x40010000, APPNIC_DMA_PCI_CONTROL);
 	write_mac(0x30000, APPNIC_DMA_CONTROL);
-#ifdef CONFIG_ARM
 	writel(0x280044,
 	       (void __iomem *)((unsigned long)pdata->dma_base + 0x60));
 	writel(0xc0,
 	       (void __iomem *)((unsigned long)pdata->dma_base + 0x64));
-#else
-	out_le32((unsigned int *)pdata->dma_base + 0x60, 0x280044);
-	out_le32((unsigned int *)pdata->dma_base + 0x64, 0xc0);
-#endif
 
 	/* Set the MAC address. */
-	pr_info("%s: MAC %pM\n", AXXIA_DRV_NAME, dev->dev_addr);
+	dev_info(d, "MAC %pM\n", dev->dev_addr);
 
 	memcpy(&address.sa_data[0], dev->dev_addr, ETH_ALEN);
 	rc = appnic_set_mac_address(dev, &address);
 	if (rc != 0) {
-		pr_err("%s: Unable to set MAC address!\n", AXXIA_DRV_NAME);
+		dev_err(d, "Unable to set MAC address!\n");
 		goto err_set_mac_addr;
 	}
 
@@ -1504,7 +1542,7 @@ int appnic_init(struct net_device *dev)
 	/* Setup IRQ. */
 	rc = femac_irq_setup(dev);
 	if (rc != 0) {
-		pr_err("%s: IRQ setup failed!\n", AXXIA_DRV_NAME);
+		dev_err(d, "IRQ setup failed!\n");
 		goto err_irq_setup;
 	}
 
@@ -1538,21 +1576,15 @@ static int appnic_probe_config_dt(struct net_device *dev,
 {
 	struct appnic_device *pdata = netdev_priv(dev);
 	const char *mac;
-#ifdef CONFIG_ARM
 	struct device_node *gp_node;
-#else
-	const u32 *field;
-	u64 value64;
-	u32 value32;
-#endif
+	struct device *d = &dev->dev;
 
 	if (!np)
 		return -ENODEV;
 
-#ifdef CONFIG_ARM
 	gp_node = of_find_compatible_node(NULL, NULL, "axxia,gpreg");
 	if (!gp_node) {
-		pr_err("%s: DTS is missing mode 'gpreg'\n", AXXIA_DRV_NAME);
+		dev_err(d, "DTS is missing mode 'gpreg'\n");
 		return -ENODEV;
 	}
 	pdata->gpreg_base = of_iomap(gp_node, 0);
@@ -1564,36 +1596,6 @@ static int appnic_probe_config_dt(struct net_device *dev,
 	pdata->tx_interrupt = irq_of_parse_and_map(np, 0);
 	pdata->rx_interrupt = irq_of_parse_and_map(np, 1);
 	pdata->dma_interrupt = irq_of_parse_and_map(np, 2);
-#else
-	field = of_get_property(np, "enabled", NULL);
-
-	if (!field || (field && (*field == 0)))
-		goto device_tree_failed;
-
-	field = of_get_property(np, "reg", NULL);
-
-	if (!field)
-		goto device_tree_failed;
-
-	value64 = of_translate_address(np, field);
-	value32 = field[3];
-	field += 2;
-	pdata->rx_base = ioremap(value64, value32);
-	value64 = of_translate_address(np, field);
-	value32 = field[3];
-	field += 2;
-	pdata->tx_base = ioremap(value64, value32);
-	value64 = of_translate_address(np, field);
-	value32 = field[3];
-	field += 2;
-	pdata->dma_base = ioremap(value64, value32);
-
-	field = of_get_property(np, "interrupts", NULL);
-	if (!field)
-		goto device_tree_failed;
-	else
-		pdata->dma_interrupt = field[0];
-#endif
 
 	mac = of_get_mac_address(np);
 	if (!mac)
@@ -1606,10 +1608,8 @@ static int appnic_probe_config_dt(struct net_device *dev,
 	return 0;
 
 device_tree_failed:
-	pr_err("%s: Reading Device Tree Failed\n", AXXIA_DRV_NAME);
-#ifdef CONFIG_ARM
+	dev_err(d, "Reading Device Tree Failed\n");
 	iounmap(pdata->gpreg_base);
-#endif
 	iounmap(pdata->rx_base);
 	iounmap(pdata->tx_base);
 	iounmap(pdata->dma_base);
@@ -1634,13 +1634,13 @@ static int appnic_drv_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 	struct net_device *ndev;
 	struct appnic_device *pdata;
+	struct device *d;
 
 	pr_info("%s: INTEL(R) 10/100 Network Driver - version %s\n",
 		AXXIA_DRV_NAME, AXXIA_DRV_VERSION);
 	dev_info(&pdev->dev, "JURA: PDU overrun tracing enabled\n");
 
 	/* Allocate space for the device. */
-
 	ndev = alloc_etherdev(sizeof(struct appnic_device));
 	if (!ndev) {
 		pr_err("%s: Couldn't allocate net device.\n", AXXIA_DRV_NAME);
@@ -1654,6 +1654,14 @@ static int appnic_drv_probe(struct platform_device *pdev)
 	pdata = netdev_priv(ndev);
 	pdata->netdev = ndev;
 	pdata->dev = &pdev->dev;
+	d = &ndev->dev;
+
+	if (dma_set_mask(&pdev->dev, DMA_BIT_MASK(32)) ||
+	    dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32))) {
+		dev_err(d, "No usable DMA configuration, aborting\n");
+		rc = -EIO;
+		goto err_inval;
+	}
 
 	/* In the case of a fixed PHY, the DT node associated
 	 * to the PHY is the Ethernet MAC DT node.
@@ -1661,7 +1669,7 @@ static int appnic_drv_probe(struct platform_device *pdev)
 	if (of_phy_is_fixed_link(np)) {
 		rc = of_phy_register_fixed_link(np);
 		if (rc) {
-			pr_err("%s: Failed to register fixed PHY\n", AXXIA_DRV_NAME);
+			dev_err(d, "Failed to register fixed PHY\n");
 			goto err_inval;
 		}
 		pdata->phy_dn = of_node_get(np);
@@ -1669,7 +1677,7 @@ static int appnic_drv_probe(struct platform_device *pdev)
 		pdata->phy_dn = of_parse_phandle(np, "phy-handle", 0);
 
 		if (!pdata->phy_dn) {
-			pr_err("%s: No phy-handle\n", AXXIA_DRV_NAME);
+			dev_err(d, "No phy-handle\n");
 			rc = -ENODEV;
 			goto err_inval;
 		}
@@ -1694,8 +1702,7 @@ static int appnic_drv_probe(struct platform_device *pdev)
 		unsigned char ethaddr_string[20];
 
 		if (ubootenv_get("ethaddr", ethaddr_string) != 0) {
-			pr_err("%s: Could not read ethernet address!\n",
-			       AXXIA_DRV_NAME);
+			dev_err(d, "Could not read ethernet address!\n");
 			rc = -EINVAL;
 			goto err_inval;
 		} else {
@@ -1717,8 +1724,7 @@ static int appnic_drv_probe(struct platform_device *pdev)
 			memcpy(ndev->perm_addr, mac_address, ETH_ALEN);
 			ndev->addr_len = ETH_ALEN;
 
-			pr_info("%s: Using Static Addresses and Interrupts",
-				AXXIA_DRV_NAME);
+			dev_info(d, "Using Static Addresses and Interrupts");
 			pdata->rx_base = ioremap(0x002000480000ULL, 0x1000);
 			pdata->tx_base = ioremap(0x002000481000ULL, 0x1000);
 			pdata->dma_base = ioremap(0x002000482000ULL, 0x1000);
@@ -1726,7 +1732,7 @@ static int appnic_drv_probe(struct platform_device *pdev)
 		}
 #else
 		/* Neither dtb info nor ubootenv driver found. */
-		pr_err("%s: Could not read ethernet address!", AXXIA_DRV_NAME);
+		dev_err(d, "Could not read ethernet address!");
 		rc = -EINVAL;
 		goto err_inval;
 #endif
@@ -1757,7 +1763,7 @@ static int appnic_drv_probe(struct platform_device *pdev)
 	/* Initialize the device. */
 	rc = appnic_init(ndev);
 	if (rc != 0) {
-		pr_err("%s: appnic_init() failed: %d\n", AXXIA_DRV_NAME, rc);
+		dev_err(d, "appnic_init() failed: %d\n", rc);
 		rc = -ENODEV;
 		goto err_nodev;
 	}
@@ -1765,8 +1771,7 @@ static int appnic_drv_probe(struct platform_device *pdev)
 	/* Register the device. */
 	rc = register_netdev(ndev);
 	if (rc != 0) {
-		pr_err("%s: register_netdev() failed: %d\n",
-		       AXXIA_DRV_NAME, rc);
+		dev_err(d, "register_netdev() failed: %d\n", rc);
 		rc = -ENODEV;
 		goto err_nodev;
 	}
@@ -1779,9 +1784,6 @@ static int appnic_drv_probe(struct platform_device *pdev)
 		pr_err("Could not attach to PHY\n");
 		return -ENODEV;
 	}
-
-	pr_debug("[%s] (phy %s)\n",
-		 pdata->phy_dev->drv->name, dev_name(pdata->dev));
 
 	return 0;
 
@@ -1801,7 +1803,7 @@ static int appnic_drv_remove(struct platform_device *pdev)
 	struct net_device *dev = platform_get_drvdata(pdev);
 	struct appnic_device *pdata = NULL;
 
-	pr_info("%s: Stopping driver", AXXIA_DRV_NAME);
+	dev_info(&dev->dev, "stopping driver");
 
 	WARN_ON(!dev);
 	if (!dev)
@@ -1828,11 +1830,169 @@ static int appnic_drv_remove(struct platform_device *pdev)
 	iounmap(pdata->rx_base);
 	iounmap(pdata->tx_base);
 	iounmap(pdata->dma_base);
-#ifdef CONFIG_ARM
 	iounmap(pdata->gpreg_base);
-#endif
 
 	return 0;
+}
+
+/* ----------------------------------------------------------------------
+ * axxianet_reset
+ */
+
+static void axxianet_reset(struct net_device *ndev)
+{
+	struct appnic_device *pdata = netdev_priv(ndev);
+	struct appnic_dma_descriptor descriptor;
+	struct device *dev = &ndev->dev;
+	unsigned long swap_source_address;
+	struct sockaddr address;
+	unsigned long node_cfg;
+	unsigned long buf;
+	unsigned long flags;
+	int index;
+
+	dev_warn(dev, "Resetting Axxia FEMAC");
+
+	/* Block transmits until done! */
+	spin_lock_irqsave(&pdata->tx_lock, flags);
+
+	/* Reset the MAC */
+	write_mac(0x80000000, APPNIC_DMA_PCI_CONTROL);
+
+	/* Initialize the Descriptor Rings and Buffers */
+	memset((void *)pdata->rx_tail, 0, sizeof(union appnic_queue_pointer));
+	memset((void *)pdata->tx_tail, 0, sizeof(union appnic_queue_pointer));
+	memset((void *)pdata->rx_desc, 0,
+	       (sizeof(struct appnic_dma_descriptor) * pdata->rx_num_desc));
+	memset((void *)pdata->tx_desc, 0,
+	       (sizeof(struct appnic_dma_descriptor) * pdata->tx_num_desc));
+
+	buf = (unsigned long)pdata->rx_buf_dma;
+	for (index = 0; index < pdata->rx_num_desc; ++index) {
+		memset((void *)&descriptor, 0,
+		       sizeof(struct appnic_dma_descriptor));
+		descriptor.write = 1;
+		descriptor.interrupt_on_completion = 1;
+		descriptor.host_data_memory_pointer = buf;
+		descriptor.data_transfer_length = pdata->rx_buf_per_desc;
+
+		writedescriptor(((unsigned long)pdata->rx_desc + (index *
+				sizeof(struct appnic_dma_descriptor))),
+				&descriptor);
+
+		buf += pdata->rx_buf_per_desc;
+	}
+
+	buf = (unsigned long)pdata->tx_buf_dma;
+
+	for (index = 0; index < pdata->tx_num_desc; ++index) {
+		memset((void *)&descriptor, 0,
+		       sizeof(struct appnic_dma_descriptor));
+		descriptor.write = 1;
+		descriptor.interrupt_on_completion = 1;
+		descriptor.host_data_memory_pointer = buf;
+
+		writedescriptor(((unsigned long)pdata->tx_desc + (index *
+				 sizeof(struct appnic_dma_descriptor))),
+				&descriptor);
+
+		buf += pdata->tx_buf_per_desc;
+	}
+
+	/* Take MAC out of reset. */
+	write_mac(0x0, APPNIC_RX_SOFT_RESET);
+	write_mac(0x1, APPNIC_RX_MODE);
+	write_mac(0x0, APPNIC_TX_SOFT_RESET);
+	write_mac(0x1, APPNIC_TX_MODE);
+
+	/* Set the watermark. */
+	ncr_read(NCP_REGION_ID(0x16, 0xff), 0x10, 4, &node_cfg);
+
+	if (0 == (0x80000000 & node_cfg))
+		write_mac(0x300a, APPNIC_TX_WATERMARK);
+	else
+		write_mac(0xc00096, APPNIC_TX_WATERMARK);
+
+	write_mac(0x1, APPNIC_TX_HALF_DUPLEX_CONF);
+	write_mac(0xffff, APPNIC_TX_TIME_VALUE_CONF);
+	write_mac(0x1, APPNIC_TX_INTERRUPT_CONTROL);
+	write_mac(0x5275, APPNIC_TX_EXTENDED_CONF);
+	write_mac(0x1, APPNIC_RX_INTERNAL_INTERRUPT_CONTROL);
+	write_mac(0x1, APPNIC_RX_EXTERNAL_INTERRUPT_CONTROL);
+	write_mac(0x40010000, APPNIC_DMA_PCI_CONTROL);
+	write_mac(0x30000, APPNIC_DMA_CONTROL);
+	writel(0x280044,
+	       (void __iomem *)((unsigned long)pdata->dma_base + 0x60));
+	writel(0xc0,
+	       (void __iomem *)((unsigned long)pdata->dma_base + 0x64));
+
+	/* Write the MAC address back. */
+	memcpy(&address.sa_data, ndev->dev_addr, ETH_ALEN);
+	swap_source_address = ((address.sa_data[4]) << 8) |
+			       address.sa_data[5];
+	write_mac(swap_source_address, APPNIC_SWAP_SOURCE_ADDRESS_2);
+	swap_source_address = ((address.sa_data[2]) << 8) |
+			address.sa_data[3];
+	write_mac(swap_source_address, APPNIC_SWAP_SOURCE_ADDRESS_1);
+	swap_source_address = ((address.sa_data[0]) << 8) |
+			       address.sa_data[1];
+	write_mac(swap_source_address, APPNIC_SWAP_SOURCE_ADDRESS_0);
+
+	/* Initialize the queue pointers. */
+
+	/* Receiver. */
+	memset((void *)&pdata->rx_tail_copy, 0,
+	       sizeof(union appnic_queue_pointer));
+	memset((void *)&pdata->rx_head, 0,
+	       sizeof(union appnic_queue_pointer));
+
+	write_mac(pdata->rx_desc_dma, APPNIC_DMA_RX_QUEUE_BASE_ADDRESS);
+	write_mac((pdata->rx_num_desc *
+		   sizeof(struct appnic_dma_descriptor)) / 1024,
+		  APPNIC_DMA_RX_QUEUE_SIZE);
+
+	/* Indicate that all of the receive descriptors are ready. */
+	pdata->rx_head.bits.offset = (pdata->rx_num_desc - 1) *
+					sizeof(struct appnic_dma_descriptor);
+	write_mac(pdata->rx_tail_dma, APPNIC_DMA_RX_TAIL_POINTER_ADDRESS);
+
+	/* Match RX pointers. */
+	pdata->rx_tail->raw = read_mac(APPNIC_DMA_RX_TAIL_POINTER_LOCAL_COPY);
+	pdata->rx_tail_copy.raw = pdata->rx_tail->raw;
+	pdata->rx_head.raw = pdata->rx_tail->raw;
+	queue_decrement(&pdata->rx_head, pdata->rx_num_desc);
+	pdata->rx_head.bits.generation_bit =
+		(pdata->rx_head.bits.generation_bit == 0) ? 1 : 0;
+	write_mac(pdata->rx_head.raw, APPNIC_DMA_RX_HEAD_POINTER);
+
+	/* Transmitter. */
+	memset((void *)&pdata->tx_tail_copy, 0,
+	       sizeof(union appnic_queue_pointer));
+	memset((void *)&pdata->tx_head, 0,
+	       sizeof(union appnic_queue_pointer));
+
+	write_mac(pdata->tx_desc_dma, APPNIC_DMA_TX_QUEUE_BASE_ADDRESS);
+	write_mac((pdata->tx_num_desc *
+		   sizeof(struct appnic_dma_descriptor)) / 1024,
+		  APPNIC_DMA_TX_QUEUE_SIZE);
+	write_mac(pdata->tx_tail_dma, APPNIC_DMA_TX_TAIL_POINTER_ADDRESS);
+
+	/* Match TX pointers. */
+	pdata->tx_tail->raw = read_mac(APPNIC_DMA_TX_TAIL_POINTER_LOCAL_COPY);
+	pdata->tx_tail_copy.raw = pdata->tx_tail->raw;
+	pdata->tx_head.raw = pdata->tx_tail->raw;
+	write_mac(pdata->tx_head.raw, APPNIC_DMA_TX_HEAD_POINTER);
+
+	/* Sync up the MAC and the PHY */
+	appnic_handle_link_change(ndev);
+
+	/* Enable interrupts. */
+	write_mac((APPNIC_DMA_INTERRUPT_ENABLE_RECEIVE |
+		   APPNIC_DMA_INTERRUPT_ENABLE_TRANSMIT),
+		   APPNIC_DMA_INTERRUPT_ENABLE);
+
+	/* Unblock transmits. */
+	spin_unlock_irqrestore(&pdata->tx_lock, flags);
 }
 
 static const struct of_device_id appnic_dt_ids[] = {
