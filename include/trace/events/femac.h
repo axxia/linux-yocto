@@ -153,6 +153,19 @@ TRACE_EVENT(rx_packets_finish,
 	    TP_printk("packets=%d", __entry->packets)
 	);
 
+TRACE_EVENT(rx_packet_not_for_us,
+
+	    TP_PROTO(int packets),
+
+	    TP_ARGS(packets),
+
+	    TP_STRUCT__entry(__field(int, not_for_us_packets)),
+
+	    TP_fast_assign(__entry->not_for_us_packets = packets;),
+
+	    TP_printk("not_for_us_packets=%d", __entry->not_for_us_packets)
+	);
+
 #endif /* _TRACE_FEMAC_H */
 
 /* This part must be outside protection */

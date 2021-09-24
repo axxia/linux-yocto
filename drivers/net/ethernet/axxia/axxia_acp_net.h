@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 
-/* drivers/net/ethernet/axxia/axxia_acp_net.h */
+/* Copyright (C) 2021 INTEL Corporation
+ */
 
 #ifndef _AXXIA_ACP_NET_H
 #define _AXXIA_ACP_NET_H
@@ -125,6 +126,7 @@ struct appnic_device {
 	unsigned long out_of_tx_descriptors;
 	unsigned long transmit_interrupts;
 	unsigned long receive_interrupts;
+	unsigned long not_for_us;
 
 	/* DMA-able memory */
 	int dma_alloc_size;
@@ -141,9 +143,9 @@ struct appnic_device {
 	int dma_alloc_offset_tx;
 
 	/* tail pointers */
-	volatile union appnic_queue_pointer *rx_tail;
+	union appnic_queue_pointer *rx_tail;
 	dma_addr_t rx_tail_dma;
-	volatile union appnic_queue_pointer *tx_tail;
+	union appnic_queue_pointer *tx_tail;
 	dma_addr_t tx_tail_dma;
 
 	/* descriptors */
@@ -169,6 +171,9 @@ struct appnic_device {
 	union appnic_queue_pointer rx_head;
 	union appnic_queue_pointer tx_tail_copy;
 	union appnic_queue_pointer tx_head;
+
+	/* Promiscuous Mode */
+	int promiscuous_mode;
 
 	/* Spin Lock */
 	spinlock_t dev_lock;	/* Device Lock */
@@ -316,7 +321,7 @@ struct appnic_device {
 
 #define APPNIC_TX_EXTENDED_CONF ((unsigned long)pdata->tx_base + 0x30)
 #define APPNIC_TX_EXTENDED_CONF_TRANSMIT_COLLISION_WATERMARK_LEVEL 0xf000
-#define APPNIC_TX_EXTENDED_CONF_EXCESSIVE_DEFFERED_PACKET_DROP 0x200
+#define APPNIC_TX_EXTENDED_CONF_EXCESSIVE_DEFERRED_PACKET_DROP 0x200
 #define APPNIC_TX_EXTENDED_CONF_JUMBO9K 0x100
 #define APPNIC_TX_EXTENDED_CONF_LATE_COLLISION_WINDOW_COUNT 0xff
 
@@ -573,18 +578,17 @@ static inline int
 femac_alloc_mem_buffers(struct net_device *dev)
 {
 	struct appnic_device *pdata = netdev_priv(dev);
-	struct device *device = NULL;
+	struct device *device = pdata->dev;
 	int rc;
 
 #ifndef CONFIG_ARM
 	dev->dev.archdata.dma_ops = &dma_direct_ops;
-	device = &dev->dev;
 #endif
 
-	pdata->dma_alloc = (void *)dma_alloc_coherent(device,
-						      pdata->dma_alloc_size,
-						      &pdata->dma_alloc_dma,
-						      GFP_KERNEL);
+	pdata->dma_alloc = dma_alloc_coherent(device,
+					      pdata->dma_alloc_size,
+					      &pdata->dma_alloc_dma,
+					      GFP_KERNEL);
 	if (pdata->dma_alloc == (void *)0) {
 		rc = -ENOMEM;
 		goto err_dma_alloc;
@@ -593,11 +597,10 @@ femac_alloc_mem_buffers(struct net_device *dev)
 	pdata->dma_alloc_offset = (int)pdata->dma_alloc -
 		(int)pdata->dma_alloc_dma;
 
-	pdata->dma_alloc_rx =
-		(void *)dma_alloc_coherent(device,
-					   pdata->dma_alloc_size_rx,
-					   &pdata->dma_alloc_dma_rx,
-					   GFP_KERNEL);
+	pdata->dma_alloc_rx = dma_alloc_coherent(device,
+						 pdata->dma_alloc_size_rx,
+						 &pdata->dma_alloc_dma_rx,
+						 GFP_KERNEL);
 	if (pdata->dma_alloc_rx == (void *)0) {
 		rc = -ENOMEM;
 		goto err_dma_alloc_rx;
@@ -606,11 +609,10 @@ femac_alloc_mem_buffers(struct net_device *dev)
 	pdata->dma_alloc_offset_rx = (int)pdata->dma_alloc_rx -
 		(int)pdata->dma_alloc_dma_rx;
 
-	pdata->dma_alloc_tx =
-		(void *)dma_alloc_coherent(device,
-					   pdata->dma_alloc_size_tx,
-					   &pdata->dma_alloc_dma_tx,
-					   GFP_KERNEL);
+	pdata->dma_alloc_tx = dma_alloc_coherent(device,
+						 pdata->dma_alloc_size_tx,
+						 &pdata->dma_alloc_dma_tx,
+						 GFP_KERNEL);
 
 	if (pdata->dma_alloc_tx == (void *)0) {
 		rc = -ENOMEM;
