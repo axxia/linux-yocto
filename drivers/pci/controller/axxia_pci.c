@@ -93,6 +93,13 @@ static const struct resource pcie_outbound_default[] = {
 	}
 };
 
+static struct resource busn_resource = {
+	.name	= "PCI busn",
+	.start	= 0,
+	.end	= 255,
+	.flags	= IORESOURCE_BUS,
+};
+
 struct axxia_pciex_port {
 	char                name[16];
 	unsigned int        index;
@@ -133,16 +140,16 @@ fixup_axxia_pci_bridge(struct pci_dev *dev)
 
 	/* Set the class appropriately for a bridge device */
 	dev_info(&dev->dev,
-		 "Fixup PCI Class to PCI_CLASS_BRIDGE_HOST for %04x:%04x\n",
-		 dev->vendor, dev->device);
-	dev->class = PCI_CLASS_BRIDGE_HOST << 8;
-	/* Make the bridge transparent */
-	dev->transparent = 1;
+		 "Fixup PCI Class to PCI_CLASS_BRIDGE_HOST for %04x:%04x Class was: %06x\n",
+		 dev->vendor, dev->device, dev->class);
+
+	/* Make the bridge transparent - Bit is taken from class field */
+	dev->class = (PCI_CLASS_BRIDGE_HOST << 8) | 1;
 }
 
-DECLARE_PCI_FIXUP_HEADER(0x1000, 0x5101, fixup_axxia_pci_bridge);
-DECLARE_PCI_FIXUP_HEADER(0x1000, 0x5108, fixup_axxia_pci_bridge);
-DECLARE_PCI_FIXUP_HEADER(0x1000, 0x5120, fixup_axxia_pci_bridge);
+DECLARE_PCI_FIXUP_EARLY(0x1000, 0x5101, fixup_axxia_pci_bridge);
+DECLARE_PCI_FIXUP_EARLY(0x1000, 0x5108, fixup_axxia_pci_bridge);
+DECLARE_PCI_FIXUP_EARLY(0x1000, 0x5120, fixup_axxia_pci_bridge);
 
 /*
  * Return the configuration access base address
@@ -515,6 +522,7 @@ static int axxia_pcie_setup(struct axxia_pciex_port *port,
 	}
 	pci_add_resource_offset(res, &port->outbound,
 				port->outbound.start - port->pci_addr);
+	pci_add_resource(res, &busn_resource);
 
 	/* Status/error interrupt */
 	port->irq[0] = irq_of_parse_and_map(port->node, 0);
@@ -557,7 +565,7 @@ static int axxia_pcie_setup(struct axxia_pciex_port *port,
 		}
 		/* Enable doorbell interrupts */
 		writel(INT1_DOORBELL, port->regs + PCIE_INT1_ENABLE);
-		return 1;
+		return 0;
 	}
 
 	/* Make sure the link is up */
@@ -661,7 +669,6 @@ axxia_probe_pciex_bridge(struct platform_device *pdev)
 	u64 size;
 	LIST_HEAD(res);
 	struct pci_bus *bus;
-	int lastbus;
 
 	port = devm_kzalloc(&pdev->dev, sizeof(*port), GFP_KERNEL);
 	if (!port)
@@ -781,14 +788,12 @@ axxia_probe_pciex_bridge(struct platform_device *pdev)
 
 	if (axxia_pcie_setup(port, &res)) {
 		port->sysdata.private_data = port;
-		bus = pci_create_root_bus(&pdev->dev, 0,
-					  &axxia_pciex_pci_ops,
-					  &port->sysdata, &res);
+		bus = pci_scan_root_bus(&pdev->dev, 1,
+					&axxia_pciex_pci_ops,
+					&port->sysdata, &res);
 		if (!bus)
 			return 1;
 
-		lastbus = pci_scan_child_bus(bus);
-		pci_bus_update_busn_res_end(bus, lastbus);
 		pci_assign_unassigned_bus_resources(bus);
 		pci_bus_add_devices(bus);
 
