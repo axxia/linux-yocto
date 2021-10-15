@@ -142,7 +142,7 @@ fixup_axxia_pci_bridge(struct pci_dev *dev)
 
 DECLARE_PCI_FIXUP_HEADER(0x1000, 0x5101, fixup_axxia_pci_bridge);
 DECLARE_PCI_FIXUP_HEADER(0x1000, 0x5108, fixup_axxia_pci_bridge);
-DECLARE_PCI_FIXUP_HEADER(0x1000, 0x5120, fixup_axxia_pci_bridge);
+DECLARE_PCI_FIXUP_EARLY(0x1000, 0x5120, fixup_axxia_pci_bridge);
 
 /*
  * Return the configuration access base address
@@ -661,7 +661,6 @@ axxia_probe_pciex_bridge(struct platform_device *pdev)
 	u64 size;
 	LIST_HEAD(res);
 	struct pci_bus *bus;
-	int lastbus;
 
 	port = devm_kzalloc(&pdev->dev, sizeof(*port), GFP_KERNEL);
 	if (!port)
@@ -781,14 +780,12 @@ axxia_probe_pciex_bridge(struct platform_device *pdev)
 
 	if (axxia_pcie_setup(port, &res)) {
 		port->sysdata.private_data = port;
-		bus = pci_create_root_bus(&pdev->dev, 0,
-					  &axxia_pciex_pci_ops,
-					  &port->sysdata, &res);
+		bus = pci_scan_root_bus(&pdev->dev, 0,
+					&axxia_pciex_pci_ops,
+					&port->sysdata, &res);
 		if (!bus)
 			return 1;
 
-		lastbus = pci_scan_child_bus(bus);
-		pci_bus_update_busn_res_end(bus, lastbus);
 		pci_assign_unassigned_bus_resources(bus);
 		pci_bus_add_devices(bus);
 
