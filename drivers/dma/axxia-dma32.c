@@ -523,8 +523,8 @@ gpdma_prep_sg(struct dma_chan *chan,
 			src = sg_dma_address(src_sg) +
 				sg_dma_len(src_sg) - src_avail;
 
-			src_acc = min(ffs((u32)src | len) - 1, 4);
-			dst_acc = min(ffs((u32)dst | len) - 1, 4);
+			src_acc = min((u32)(ffs((u32)src | len) - 1), (u32)4);
+			dst_acc = min((u32)(ffs((u32)dst | len) - 1), (u32)4);
 
 			new = get_descriptor(dmac->engine);
 			if (!new) {
@@ -636,8 +636,8 @@ gpdma_prep_memcpy(struct dma_chan *chan,
 		len = min_t(size_t, size, (size_t)SZ_64K);
 
 		/* Maximize access width based on address and length alignmet */
-		src_acc = min(ffs((u32)src | len) - 1, 4);
-		dst_acc = min(ffs((u32)dst | len) - 1, 4);
+		src_acc = min((u32)(ffs((u32)src | len) - 1), (u32)4);
+		dst_acc = min((u32)(ffs((u32)dst | len) - 1), (u32)4);
 
 		init_descriptor(new, src, src_acc, dst, dst_acc, len);
 
