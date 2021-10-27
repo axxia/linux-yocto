@@ -174,7 +174,7 @@ axxia_pei_trace(void *address, int read, u32 value)
 	unsigned int offset;
 
 	pci_gpreg = (unsigned long)address;
-	pci_gpreg &= ~0x1ffff;
+	pci_gpreg &= (unsigned long)(~0x1ffff);
 
 	if (is_5600 != 0) {
 		if ((unsigned long)axxia_pei[0].virt ==
