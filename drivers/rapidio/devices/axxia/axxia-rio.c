@@ -89,7 +89,7 @@ axxia_rapidio_board_init(struct platform_device *dev, int dev_num,
 
 		reg = inl((unsigned long)(gpreg_base + 0x60));
 
-		reg &= ~(0xf << (dev_num * 4));
+		reg &= (unsigned long)(~(0xf << (dev_num * 4)));
 
 		outl_p(reg, (unsigned long)(gpreg_base + 0x60));
 
