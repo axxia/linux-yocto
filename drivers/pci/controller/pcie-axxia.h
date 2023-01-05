@@ -61,7 +61,6 @@ struct pcie_port {
 	struct irq_domain	*msi_domain;
 	struct mutex		bitmap_lock; /* Bitmap Mutex */
 	unsigned long		*bitmap;
-	struct msi_controller chip;
 	DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
 };
 
@@ -83,7 +82,6 @@ struct pcie_host_ops {
 	u32 (*get_msi_addr)(struct pcie_port *pp);
 	u32 (*get_msi_data)(struct pcie_port *pp, int pos);
 	void (*scan_bus)(struct pcie_port *pp);
-	int (*msi_host_init)(struct pcie_port *pp, struct msi_controller *chip);
 };
 
 int axxia_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
