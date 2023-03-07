@@ -1248,7 +1248,6 @@ nemac_probe(struct platform_device *pdev)
 	struct device_node * const dn = dev->of_node;
 	struct nemac_priv *priv;
 	struct net_device *ndev;
-	u8 macaddr_dt[ETH_ALEN];
 	struct resource *res;
 	int ret;
 
