@@ -1090,7 +1090,7 @@ axxia_pcie_los_wa(struct pcie_port *pp, unsigned int max_width)
 
 	for (;;) {
 		int i;
-		unsigned short temp;
+		unsigned int temp;
 		unsigned int region;
 
 		/*
